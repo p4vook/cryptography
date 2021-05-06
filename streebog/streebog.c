@@ -237,17 +237,16 @@ void
 process_vector(struct streebog_context *ctx, const uint8_t *vec, size_t len, int is_final)
 {
         uint64_t block[BLOCK_SIZE];
-        const uint64_t *block_ptr = (const uint64_t*) (vec + len);
+        const uint64_t *block_ptr = (const uint64_t*) vec;
         int block_len = BLOCK_SIZE * 8 * BYTE_SIZE;
         while (len >= block_len / BYTE_SIZE) {
-                block_ptr -= BLOCK_SIZE;
                 // reversed order
                 for (int i = BLOCK_SIZE - 1; i >= 0; --i) {
                         block[i] = *(block_ptr++);
                 }
                 process_block(ctx, block, block_len);
-                block_ptr -= BLOCK_SIZE;
                 len -= block_len / BYTE_SIZE;
+                vec += block_len / BYTE_SIZE;
         }
         if (!is_final) {
                 return;
