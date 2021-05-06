@@ -223,7 +223,7 @@ struct stribog_calculator {
 void init_512_calculator(struct stribog_calculator *calc) {
         fill_with(calc->h, 0);
         fill_with(calc->N, 0);
-        fill_with(calc->EPSILON, 0);for (int i = 0; i < BLOCK_SIZE; ++i) {
+        for (int i = 0; i < BLOCK_SIZE; ++i) {
                 calc->h[i] = 0;
                 calc->N[i] = 0;
                 calc->EPSILON[i] = 0;
@@ -247,7 +247,9 @@ void transform_g(struct stribog_calculator *calc, block_t block) {
         copy_block(calc->h, tmp_block);
 }
 
-void process_block(struct stribog_calculator *calc, block_t block, unsigned block_len) {
+void
+process_block(struct stribog_calculator *calc, block_t block, unsigned block_len) 
+{
        transform_g(calc, block); 
        __u64 tmp_block[BLOCK_SIZE];
        for (int i = 0; i < BLOCK_SIZE; ++i) {
@@ -266,13 +268,17 @@ void calculate_result(struct stribog_calculator *calc) {
         transform_g(calc, calc->EPSILON);
 }
 
-void get_512_result(struct stribog_calculator *calc, __u64 result[8]) {
-        copy_block(result, calc->h);
+void get_512_result(struct stribog_calculator *calc, __u8 *result) {
+        __u64 *result_u64 = (__u64*) result;
+        for (int i = 0; i < 8; ++i) {
+                result_u64[i] = calc->h[7 - i];
+        }
 }
 
-void get_256_result(struct stribog_calculator *calc, __u64 result[4]) {
+void get_256_result(struct stribog_calculator *calc, __u8 *result) {
+        __u64 *result_u64 = (__u64*) result;
         for (int i = 0; i < 4; ++i) {
-                result[i] = calc->h[i];
+                result_u64[i] = calc->h[3 - i];
         }
 }
 
@@ -282,8 +288,9 @@ void process_vector(struct stribog_calculator *calc, __u8 *vec, size_t len) {
         int block_len = BLOCK_SIZE * 8 * BYTE_SIZE;
         while (len >= block_len / BYTE_SIZE) {
                 block_ptr -= BLOCK_SIZE;
-                for (int i = 0; i < BLOCK_SIZE; ++i) {
-                        block[i] = bswap_64(*(block_ptr++));
+                // reversed order
+                for (int i = BLOCK_SIZE - 1; i >= 0; --i) {
+                        block[i] = *(block_ptr++);
                 }
                 process_block(calc, block, block_len);
                 block_ptr -= BLOCK_SIZE;
@@ -299,10 +306,14 @@ void process_vector(struct stribog_calculator *calc, __u8 *vec, size_t len) {
                 bits[bit_i] = 0;
         }
         bits[bit_i++] = 1;
+        // next bytes in reverse order
+        bit_i = block_len;
         while (len > 0) {
+                bit_i -= BYTE_SIZE;
                 for (int char_bit_i = BYTE_SIZE - 1; char_bit_i >= 0; --char_bit_i) {
                         bits[bit_i++] = ((*vec) >> char_bit_i) & 1;
                 }
+                bit_i -= BYTE_SIZE;
                 ++vec;
                 --len;
         }
@@ -323,12 +334,15 @@ void process_string(struct stribog_calculator *calc, char *str) {
 int main()
 {
         char msg[64];
-        strcpy(msg, "210987654321098765432109876543210987654321098765432109876543210");
+        strcpy(msg, "012345678901234567890123456789012345678901234567890123456789012");
         struct stribog_calculator calc;
         init_256_calculator(&calc);
         process_string(&calc, msg);
         calculate_result(&calc);
-        __u64 result[4];
+        __u8 result[32];
         get_256_result(&calc, result);
-        printf("%016llx%016llx%016llx%016llx\n", result[0], result[1], result[2], result[3]);
+        for (int i = 0; i < 32; ++i) {
+                printf("%02x", result[i]);       
+        }
+        printf("\n");
 }
