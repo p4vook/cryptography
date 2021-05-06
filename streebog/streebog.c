@@ -243,14 +243,14 @@ calculate_E(block_t result, block_t K, block_t m)
         }
 }
 
-struct stribog_calculator {
+struct streebog_calculator {
         __u64 h[BLOCK_SIZE];
         __u64 N[BLOCK_SIZE];
         __u64 EPSILON[BLOCK_SIZE];
 };
 
 void
-init_512_calculator(struct stribog_calculator *calc)
+init_512_calculator(struct streebog_calculator *calc)
 {
         fill_with(calc->h, 0);
         fill_with(calc->N, 0);
@@ -262,7 +262,7 @@ init_512_calculator(struct stribog_calculator *calc)
 }
 
 void
-init_256_calculator(struct stribog_calculator *calc)
+init_256_calculator(struct streebog_calculator *calc)
 {
         fill_with(calc->h, 0x0101010101010101ull);
         fill_with(calc->N, 0);
@@ -270,7 +270,7 @@ init_256_calculator(struct stribog_calculator *calc)
 }
 
 void
-transform_g(struct stribog_calculator *calc, block_t block)
+transform_g(struct streebog_calculator *calc, block_t block)
 {
         __u64 tmp_block[BLOCK_SIZE];
         copy_block(tmp_block, calc->h);
@@ -283,7 +283,7 @@ transform_g(struct stribog_calculator *calc, block_t block)
 }
 
 void
-process_block(struct stribog_calculator *calc, block_t block, unsigned block_len) 
+process_block(struct streebog_calculator *calc, block_t block, unsigned block_len) 
 {
        transform_g(calc, block); 
        __u64 tmp_block[BLOCK_SIZE];
@@ -296,7 +296,7 @@ process_block(struct stribog_calculator *calc, block_t block, unsigned block_len
 }
 
 void
-calculate_result(struct stribog_calculator *calc)
+calculate_result(struct streebog_calculator *calc)
 {
         __u64 tmp_block[BLOCK_SIZE];
         copy_block(tmp_block, calc->N);
@@ -306,7 +306,7 @@ calculate_result(struct stribog_calculator *calc)
 }
 
 void
-get_512_result(struct stribog_calculator *calc, __u8 *result)
+get_512_result(struct streebog_calculator *calc, __u8 *result)
 {
         __u64 *result_u64 = (__u64*) result;
         for (int i = 0; i < 8; ++i) {
@@ -315,7 +315,7 @@ get_512_result(struct stribog_calculator *calc, __u8 *result)
 }
 
 void
-get_256_result(struct stribog_calculator *calc, __u8 *result)
+get_256_result(struct streebog_calculator *calc, __u8 *result)
 {
         __u64 *result_u64 = (__u64*) result;
         for (int i = 0; i < 4; ++i) {
@@ -324,7 +324,7 @@ get_256_result(struct stribog_calculator *calc, __u8 *result)
 }
 
 void
-process_vector(struct stribog_calculator *calc, __u8 *vec, size_t len)
+process_vector(struct streebog_calculator *calc, __u8 *vec, size_t len)
 {
         __u64 block[BLOCK_SIZE];
         __u64 *block_ptr = (__u64*) (vec + len);
@@ -371,7 +371,7 @@ process_vector(struct stribog_calculator *calc, __u8 *vec, size_t len)
 }
 
 void
-process_string(struct stribog_calculator *calc, char *str)
+process_string(struct streebog_calculator *calc, char *str)
 {
         process_vector(calc, str, strlen(str));
 }
@@ -381,7 +381,7 @@ main()
 {
         char msg[64];
         strcpy(msg, "012345678901234567890123456789012345678901234567890123456789012");
-        struct stribog_calculator calc;
+        struct streebog_calculator calc;
         init_256_calculator(&calc);
         process_string(&calc, msg);
         calculate_result(&calc);
