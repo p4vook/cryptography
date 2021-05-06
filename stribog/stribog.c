@@ -91,27 +91,35 @@ __u64 c_iterational[12][8] = {
 
 typedef __u64 block_t[BLOCK_SIZE];
 
-__u64 rorl_u64(__u64 n, int k) {
+__u64
+rorl_u64(__u64 n, int k)
+{
         if (k == 0) {
                 return n;
         }
         return (n << k) + (n >> (64 - k));
 }
 
-__u64 rorr_u64(__u64 n, int k) {
+__u64
+rorr_u64(__u64 n, int k)
+{
         if (k == 0) {
                 return n;
         }
         return (n >> k) + (n << (64 - k));
 }
 
-void fill_with(block_t block, __u64 value) {
+void
+fill_with(block_t block, __u64 value)
+{
         for (int i = 0; i < BLOCK_SIZE; ++i) {
                 block[i] = value;
         }
 }
 
-void ring_add(block_t dest, block_t src) {
+void
+ring_add(block_t dest, block_t src)
+{
         __u64 leftover = 0;
         for (int i = BLOCK_SIZE - 1; i >= 0; --i) {
                 __u64 old_value = dest[i];
@@ -124,13 +132,17 @@ void ring_add(block_t dest, block_t src) {
         }
 }
 
-void transform_xor(block_t block, block_t k) {
+void
+transform_xor(block_t block, block_t k)
+{
         for (int i = 0; i < BLOCK_SIZE; ++i) {
                 block[i] ^= k[i];
         }
 }
 
-void transform_substitute(block_t block) {
+void
+transform_substitute(block_t block)
+{
         for (int i = 0; i < BLOCK_SIZE; ++i) {
                 for (int byte_i = 0; byte_i < 8; ++byte_i) {
                         __u64 temp = rorr_u64(block[i], byte_i * BYTE_SIZE);
@@ -141,7 +153,9 @@ void transform_substitute(block_t block) {
         }
 }
 
-void replace_byte(block_t block, int byte_i, __u8 byte) {
+void
+replace_byte(block_t block, int byte_i, __u8 byte)
+{
         int i = byte_i >> 3; // div 8
         int internal_byte_i = byte_i & 7; // mod 8
         __u64 temp = rorr_u64(block[i], internal_byte_i * BYTE_SIZE);
@@ -149,7 +163,9 @@ void replace_byte(block_t block, int byte_i, __u8 byte) {
         block[i] = rorl_u64(temp, internal_byte_i * BYTE_SIZE);
 }
 
-void transform_permute(block_t block) {
+void
+transform_permute(block_t block)
+{
         __u64 result[BLOCK_SIZE];
         for (int i = 0; i < BLOCK_SIZE; ++i) {
                 for (int byte_i = i * 8; byte_i < (i + 1) * 8; ++byte_i) {
@@ -163,7 +179,9 @@ void transform_permute(block_t block) {
         }
 }
 
-__u64 transform_one_linear(__u64 n) {
+__u64
+transform_one_linear(__u64 n)
+{
         __u64 res = 0;
         for (int i = 0; i < 64; ++i) {
                 res ^= ((n >> (64 - i - 1)) & 1) * l_matrix[i];
@@ -171,26 +189,35 @@ __u64 transform_one_linear(__u64 n) {
         return res;
 }
 
-void transform_linear(block_t block) {
+void
+transform_linear(block_t block)
+{
         for (int i = 0; i < BLOCK_SIZE; ++i) {
                 block[i] = transform_one_linear(block[i]);
         }
 }
 
-void transform_lps(block_t block) {
+void
+transform_lps(block_t block)
+{
         transform_substitute(block);
         transform_permute(block);
         transform_linear(block);
 }
 
-void copy_block(block_t dest, block_t src) {
+void
+copy_block(block_t dest, block_t src)
+{
         for (int i = 0; i < BLOCK_SIZE; ++i) {
                 dest[i] = src[i];
         }
 }
 
 #define K_BLOCK_COUNT 13
-void calculate_K_blocks(block_t *k_blocks) {
+
+void
+calculate_K_blocks(block_t *k_blocks)
+{
         __u64 tmp_block[BLOCK_SIZE];
         copy_block(tmp_block, k_blocks[0]);
         for (int i = 1; i < K_BLOCK_COUNT; ++i) {
@@ -201,7 +228,9 @@ void calculate_K_blocks(block_t *k_blocks) {
         }
 }
 
-void calculate_E(block_t result, block_t K, block_t m) {
+void
+calculate_E(block_t result, block_t K, block_t m)
+{
         __u64 k_blocks[K_BLOCK_COUNT][BLOCK_SIZE];
         copy_block(k_blocks[0], K);
         calculate_K_blocks(k_blocks);
@@ -220,7 +249,9 @@ struct stribog_calculator {
         __u64 EPSILON[BLOCK_SIZE];
 };
 
-void init_512_calculator(struct stribog_calculator *calc) {
+void
+init_512_calculator(struct stribog_calculator *calc)
+{
         fill_with(calc->h, 0);
         fill_with(calc->N, 0);
         for (int i = 0; i < BLOCK_SIZE; ++i) {
@@ -230,13 +261,17 @@ void init_512_calculator(struct stribog_calculator *calc) {
         }
 }
 
-void init_256_calculator(struct stribog_calculator *calc) {
+void
+init_256_calculator(struct stribog_calculator *calc)
+{
         fill_with(calc->h, 0x0101010101010101ull);
         fill_with(calc->N, 0);
         fill_with(calc->EPSILON, 0);
 }
 
-void transform_g(struct stribog_calculator *calc, block_t block) {
+void
+transform_g(struct stribog_calculator *calc, block_t block)
+{
         __u64 tmp_block[BLOCK_SIZE];
         copy_block(tmp_block, calc->h);
         transform_xor(tmp_block, calc->N);
@@ -260,7 +295,9 @@ process_block(struct stribog_calculator *calc, block_t block, unsigned block_len
        ring_add(calc->EPSILON, block);
 }
 
-void calculate_result(struct stribog_calculator *calc) {
+void
+calculate_result(struct stribog_calculator *calc)
+{
         __u64 tmp_block[BLOCK_SIZE];
         copy_block(tmp_block, calc->N);
         fill_with(calc->N, 0);
@@ -268,21 +305,27 @@ void calculate_result(struct stribog_calculator *calc) {
         transform_g(calc, calc->EPSILON);
 }
 
-void get_512_result(struct stribog_calculator *calc, __u8 *result) {
+void
+get_512_result(struct stribog_calculator *calc, __u8 *result)
+{
         __u64 *result_u64 = (__u64*) result;
         for (int i = 0; i < 8; ++i) {
                 result_u64[i] = calc->h[7 - i];
         }
 }
 
-void get_256_result(struct stribog_calculator *calc, __u8 *result) {
+void
+get_256_result(struct stribog_calculator *calc, __u8 *result)
+{
         __u64 *result_u64 = (__u64*) result;
         for (int i = 0; i < 4; ++i) {
                 result_u64[i] = calc->h[3 - i];
         }
 }
 
-void process_vector(struct stribog_calculator *calc, __u8 *vec, size_t len) {
+void
+process_vector(struct stribog_calculator *calc, __u8 *vec, size_t len)
+{
         __u64 block[BLOCK_SIZE];
         __u64 *block_ptr = (__u64*) (vec + len);
         int block_len = BLOCK_SIZE * 8 * BYTE_SIZE;
@@ -327,11 +370,14 @@ void process_vector(struct stribog_calculator *calc, __u8 *vec, size_t len) {
         process_block(calc, block, bit_len);
 }
 
-void process_string(struct stribog_calculator *calc, char *str) {
+void
+process_string(struct stribog_calculator *calc, char *str)
+{
         process_vector(calc, str, strlen(str));
 }
 
-int main()
+int
+main()
 {
         char msg[64];
         strcpy(msg, "012345678901234567890123456789012345678901234567890123456789012");
