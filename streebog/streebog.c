@@ -243,88 +243,88 @@ calculate_E(block_t result, block_t K, block_t m)
         }
 }
 
-struct streebog_calculator {
+struct streebog_context {
         __u64 h[BLOCK_SIZE];
         __u64 N[BLOCK_SIZE];
         __u64 EPSILON[BLOCK_SIZE];
 };
 
 void
-init_512_calculator(struct streebog_calculator *calc)
+init_512_context(struct streebog_context *ctx)
 {
-        fill_with(calc->h, 0);
-        fill_with(calc->N, 0);
+        fill_with(ctx->h, 0);
+        fill_with(ctx->N, 0);
         for (int i = 0; i < BLOCK_SIZE; ++i) {
-                calc->h[i] = 0;
-                calc->N[i] = 0;
-                calc->EPSILON[i] = 0;
+                ctx->h[i] = 0;
+                ctx->N[i] = 0;
+                ctx->EPSILON[i] = 0;
         }
 }
 
 void
-init_256_calculator(struct streebog_calculator *calc)
+init_256_context(struct streebog_context *ctx)
 {
-        fill_with(calc->h, 0x0101010101010101ull);
-        fill_with(calc->N, 0);
-        fill_with(calc->EPSILON, 0);
+        fill_with(ctx->h, 0x0101010101010101ull);
+        fill_with(ctx->N, 0);
+        fill_with(ctx->EPSILON, 0);
 }
 
 void
-transform_g(struct streebog_calculator *calc, block_t block)
+transform_g(struct streebog_context *ctx, block_t block)
 {
         __u64 tmp_block[BLOCK_SIZE];
-        copy_block(tmp_block, calc->h);
-        transform_xor(tmp_block, calc->N);
+        copy_block(tmp_block, ctx->h);
+        transform_xor(tmp_block, ctx->N);
         transform_lps(tmp_block);
         calculate_E(tmp_block, tmp_block, block);
-        transform_xor(tmp_block, calc->h);
+        transform_xor(tmp_block, ctx->h);
         transform_xor(tmp_block, block);
-        copy_block(calc->h, tmp_block);
+        copy_block(ctx->h, tmp_block);
 }
 
 void
-process_block(struct streebog_calculator *calc, block_t block, unsigned block_len) 
+process_block(struct streebog_context *ctx, block_t block, unsigned block_len) 
 {
-       transform_g(calc, block); 
+       transform_g(ctx, block); 
        __u64 tmp_block[BLOCK_SIZE];
        for (int i = 0; i < BLOCK_SIZE; ++i) {
                 tmp_block[i] = 0;
        }
        tmp_block[BLOCK_SIZE - 1] = block_len;
-       ring_add(calc->N, tmp_block);
-       ring_add(calc->EPSILON, block);
+       ring_add(ctx->N, tmp_block);
+       ring_add(ctx->EPSILON, block);
 }
 
 void
-calculate_result(struct streebog_calculator *calc)
+calculate_result(struct streebog_context *ctx)
 {
         __u64 tmp_block[BLOCK_SIZE];
-        copy_block(tmp_block, calc->N);
-        fill_with(calc->N, 0);
-        transform_g(calc, tmp_block);
-        transform_g(calc, calc->EPSILON);
+        copy_block(tmp_block, ctx->N);
+        fill_with(ctx->N, 0);
+        transform_g(ctx, tmp_block);
+        transform_g(ctx, ctx->EPSILON);
 }
 
 void
-get_512_result(struct streebog_calculator *calc, __u8 *result)
+get_512_result(struct streebog_context *ctx, __u8 *result)
 {
         __u64 *result_u64 = (__u64*) result;
         for (int i = 0; i < 8; ++i) {
-                result_u64[i] = calc->h[7 - i];
+                result_u64[i] = ctx->h[7 - i];
         }
 }
 
 void
-get_256_result(struct streebog_calculator *calc, __u8 *result)
+get_256_result(struct streebog_context *ctx, __u8 *result)
 {
         __u64 *result_u64 = (__u64*) result;
         for (int i = 0; i < 4; ++i) {
-                result_u64[i] = calc->h[3 - i];
+                result_u64[i] = ctx->h[3 - i];
         }
 }
 
 void
-process_vector(struct streebog_calculator *calc, __u8 *vec, size_t len)
+process_vector(struct streebog_context *ctx, __u8 *vec, size_t len)
 {
         __u64 block[BLOCK_SIZE];
         __u64 *block_ptr = (__u64*) (vec + len);
@@ -335,7 +335,7 @@ process_vector(struct streebog_calculator *calc, __u8 *vec, size_t len)
                 for (int i = BLOCK_SIZE - 1; i >= 0; --i) {
                         block[i] = *(block_ptr++);
                 }
-                process_block(calc, block, block_len);
+                process_block(ctx, block, block_len);
                 block_ptr -= BLOCK_SIZE;
                 len -= block_len / BYTE_SIZE;
         }
@@ -367,13 +367,13 @@ process_vector(struct streebog_calculator *calc, __u8 *vec, size_t len)
                         block[div] |= (1ull << (63 - mod));
                 }
         }
-        process_block(calc, block, bit_len);
+        process_block(ctx, block, bit_len);
 }
 
 void
-process_string(struct streebog_calculator *calc, char *str)
+process_string(struct streebog_context *ctx, char *str)
 {
-        process_vector(calc, str, strlen(str));
+        process_vector(ctx, str, strlen(str));
 }
 
 int
@@ -381,12 +381,12 @@ main()
 {
         char msg[64];
         strcpy(msg, "012345678901234567890123456789012345678901234567890123456789012");
-        struct streebog_calculator calc;
-        init_256_calculator(&calc);
-        process_string(&calc, msg);
-        calculate_result(&calc);
+        struct streebog_context ctx;
+        init_256_context(&ctx);
+        process_string(&ctx, msg);
+        calculate_result(&ctx);
         __u8 result[32];
-        get_256_result(&calc, result);
+        get_256_result(&ctx, result);
         for (int i = 0; i < 32; ++i) {
                 printf("%02x", result[i]);       
         }
