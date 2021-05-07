@@ -10,19 +10,13 @@
 uint64_t
 rorl_u64(uint64_t n, int k)
 {
-        if (k == 0) {
-                return n;
-        }
-        return (n << k) + (n >> (64 - k));
+        return (n << k) ^ (n >> (64 - k));
 }
 
 uint64_t
 rorr_u64(uint64_t n, int k)
 {
-        if (k == 0) {
-                return n;
-        }
-        return (n >> k) + (n << (64 - k));
+        return (n >> k) ^ (n << (64 - k));
 }
 
 void
@@ -30,6 +24,14 @@ fill_with(block_t block, uint64_t value)
 {
         for (int i = 0; i < BLOCK_SIZE; ++i) {
                 block[i] = value;
+        }
+}
+
+void
+copy_block(block_t dest, block_t src)
+{
+        for (int i = 0; i < BLOCK_SIZE; ++i) {
+                dest[i] = src[i];
         }
 }
 
@@ -60,11 +62,10 @@ void
 transform_substitute(block_t block)
 {
         for (int i = 0; i < BLOCK_SIZE; ++i) {
-                for (int byte_i = 0; byte_i < 8; ++byte_i) {
-                        uint64_t temp = rorr_u64(block[i], byte_i * BYTE_SIZE);
-                        uint8_t byte = temp & 255u;
-                        temp = temp - byte + pi_bijection[byte];
-                        block[i] = rorl_u64(temp, byte_i * BYTE_SIZE);
+                for (int byte_i = 7; byte_i >= 0; --byte_i) {
+                        uint8_t byte = block[i] & 0xFF;
+                        block[i] = block[i] - byte + pi_bijection[byte];
+                        block[i] = rorr_u64(block[i], BYTE_SIZE);
                 }
         }
 }
@@ -80,7 +81,7 @@ replace_byte(block_t block, int byte_i, uint8_t byte)
 }
 
 void
-transform_permute(block_t block)
+transform_true_permute(block_t block)
 {
         uint64_t result[BLOCK_SIZE];
         for (int i = 0; i < BLOCK_SIZE; ++i) {
@@ -95,22 +96,30 @@ transform_permute(block_t block)
         }
 }
 
-uint64_t
-transform_one_linear(uint64_t n)
+void
+transform_permute(block_t block)
 {
-        uint64_t res = 0;
-        for (int i = 0; i < 64; ++i) {
-                res ^= ((n >> (64 - i - 1)) & 1) * l_matrix[i];
+        uint64_t result[BLOCK_SIZE];
+        fill_with(result, 0);
+        for (int byte_i = 0; byte_i < 8; ++byte_i) {
+                for (int i = 0; i < BLOCK_SIZE; ++i) {
+                        result[7 - byte_i] ^= ((block[7 - i] >> (byte_i * BYTE_SIZE)) & 0xFF) << (i * BYTE_SIZE);
+                }
         }
-        return res;
+        copy_block(block, result);
 }
 
 void
 transform_linear(block_t block)
 {
-        for (int i = 0; i < BLOCK_SIZE; ++i) {
-                block[i] = transform_one_linear(block[i]);
+        uint64_t res[BLOCK_SIZE];
+        fill_with(res, 0);
+        for (int bit = 0; bit < 64; ++bit) {
+                for (int i = 0; i < BLOCK_SIZE; ++i) {
+                        res[i] ^= ((block[i] >> (64 - bit - 1)) & 1) * l_matrix[bit];
+                }
         }
+        copy_block(block, res);
 }
 
 void
@@ -121,42 +130,22 @@ transform_lps(block_t block)
         transform_linear(block);
 }
 
-void
-copy_block(block_t dest, block_t src)
-{
-        for (int i = 0; i < BLOCK_SIZE; ++i) {
-                dest[i] = src[i];
-        }
-}
-
 #define K_BLOCK_COUNT 13
-
-void
-calculate_K_blocks(block_t *k_blocks)
-{
-        uint64_t tmp_block[BLOCK_SIZE];
-        copy_block(tmp_block, k_blocks[0]);
-        for (int i = 1; i < K_BLOCK_COUNT; ++i) {
-                // k_blocks[i - 1] is stored in tmp_block
-                transform_xor(tmp_block, c_iterational[i - 1]);
-                transform_lps(tmp_block);
-                copy_block(k_blocks[i], tmp_block);
-        }
-}
 
 void
 calculate_E(block_t result, block_t K, block_t m)
 {
-        uint64_t k_blocks[K_BLOCK_COUNT][BLOCK_SIZE];
-        copy_block(k_blocks[0], K);
-        calculate_K_blocks(k_blocks);
+        uint64_t tmp_block[BLOCK_SIZE];
+        copy_block(tmp_block, K);
         copy_block(result, m);
-        for (int i = 0; i < K_BLOCK_COUNT; ++i) {
-                transform_xor(result, k_blocks[i]);
-                if (i != K_BLOCK_COUNT - 1) {
-                        transform_lps(result);
-                }
+        for (int i = 0; i < K_BLOCK_COUNT - 1; ++i) {
+                transform_xor(result, tmp_block);
+                transform_lps(result);
+                // calculate next K block
+                transform_xor(tmp_block, c_iterational[i]);
+                transform_lps(tmp_block);
         }
+        transform_xor(result, tmp_block);
 }
 
 void
@@ -187,9 +176,8 @@ transform_g(struct streebog_context *ctx, block_t block)
         transform_xor(tmp_block, ctx->N);
         transform_lps(tmp_block);
         calculate_E(tmp_block, tmp_block, block);
-        transform_xor(tmp_block, ctx->h);
-        transform_xor(tmp_block, block);
-        copy_block(ctx->h, tmp_block);
+        transform_xor(ctx->h, tmp_block);
+        transform_xor(ctx->h, block);
 }
 
 void
@@ -285,11 +273,11 @@ process_vector(struct streebog_context *ctx, const uint8_t *vec, size_t len, int
 void
 process_string(struct streebog_context *ctx, const char *str)
 {
-        process_vector(ctx, str, strlen(str), 1);
+        process_vector(ctx, (const uint8_t *) str, strlen(str), 1);
 }
 
-int
-main()
+void
+test()
 {
         char msg[64];
         strcpy(msg, "012345678901234567890123456789012345678901234567890123456789012");

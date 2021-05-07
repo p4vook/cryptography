@@ -22,7 +22,7 @@ uint8_t pi_bijection[256] = {
         209, 102, 175, 194, 57, 75, 99, 182
 };
 
-// index bijection, used in permute
+// index bijection, hard-coded in permute for performance
 uint8_t tau_bijection[64] = {
         0,  8, 16, 24, 32, 40, 48, 56,
         1,  9, 17, 25, 33, 41, 49, 57,
