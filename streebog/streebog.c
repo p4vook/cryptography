@@ -1,7 +1,7 @@
 #include "streebog.h"
 #include "streebog-initial.h"
 #include "streebog-precalc.h"
-#include <byteswap.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
