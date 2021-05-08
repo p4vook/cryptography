@@ -1,5 +1,6 @@
 #include "streebog.h"
 #include "streebog-initial.h"
+#include "streebog-precalc.h"
 #include <byteswap.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -61,13 +62,15 @@ transform_xor(block_t block, block_t k)
 void
 transform_substitute(block_t block)
 {
+        uint64_t res[BLOCK_SIZE];
+        fill_with(res, 0);
         for (int i = 0; i < BLOCK_SIZE; ++i) {
-                for (int byte_i = 7; byte_i >= 0; --byte_i) {
-                        uint8_t byte = block[i] & 0xFF;
-                        block[i] = block[i] - byte + pi_bijection[byte];
-                        block[i] = rorr_u64(block[i], BYTE_SIZE);
+                for (int byte_i = 0; byte_i < 8; ++byte_i) {
+                        int byte = (block[i] >> byte_i * BYTE_SIZE) & 0xFF;
+                        res[i] ^= (uint64_t) pi_bijection[byte] << byte_i * BYTE_SIZE;
                 }
         }
+        copy_block(block, res);
 }
 
 void
@@ -114,9 +117,10 @@ transform_linear(block_t block)
 {
         uint64_t res[BLOCK_SIZE];
         fill_with(res, 0);
-        for (int bit = 0; bit < 64; ++bit) {
+        for (int byte_i = 0; byte_i < 8; ++byte_i) {
                 for (int i = 0; i < BLOCK_SIZE; ++i) {
-                        res[i] ^= ((block[i] >> (64 - bit - 1)) & 1) * l_matrix[bit];
+                        int byte = (block[i] >> (byte_i * BYTE_SIZE) & 0xFF);
+                        res[i] ^= precalc_matrix[byte_i][byte];
                 }
         }
         copy_block(block, res);
